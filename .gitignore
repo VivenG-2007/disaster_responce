@@ -15,8 +15,7 @@ secrets.json
 
 # 📦 DEPENDENCIES
 node_modules/
-backend/node/node_modules/
-next-app/node_modules/
+.pnp.*
 venv/
 .venv/
 env/
@@ -26,10 +25,11 @@ lib64/
 
 # 🏗 BUILD OUTPUTS
 .next/
-next-app/.next/
 out/
 build/
 dist/
+.vercel/
+.turbo/
 *.exe
 *.dll
 *.so
@@ -37,12 +37,12 @@ dist/
 
 # 🤖 AI & PYTHON CACHE
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*.egg-info/
 .pytest_cache/
 .coverage
 .mypy_cache/
+.ruff_cache/
 
 # 📊 DATA & ANALYTICS (Elasticsearch and n8n)
 # These are handled by Docker volumes, but we exclude any local data folders
@@ -58,6 +58,7 @@ yarn-error.log*
 # 🗺️ IDE & OS SPECIFIC
 .vscode/
 .idea/
+.cursor/
 .DS_Store
 Thumbs.db
 desktop.ini
