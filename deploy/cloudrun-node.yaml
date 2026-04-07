@@ -1,0 +1,28 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: nexus-node-gateway
+  namespace: default
+  annotations:
+    run.googleapis.com/ingress: "all"
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+    spec:
+      containers:
+      - image: gcr.io/nexus-command-demo/nexus-node-gateway:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        # Secret reference placeholder for production deploy
+        - name: NEXT_PUBLIC_MAPS_API_KEY
+          value: "YOUR_GOOGLE_MAPS_API_KEY"
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"

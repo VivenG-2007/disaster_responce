@@ -1,0 +1,26 @@
+steps:
+  # 1. Build the Docker image for the Node Gateway
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/nexus-node-gateway:latest', './backend/node']
+    
+  # 2. Push the image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/nexus-node-gateway:latest']
+    
+  # 3. Deploy image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'nexus-node-gateway'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/nexus-node-gateway:latest'
+      - '--region'
+      - 'asia-south1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+# Optional: Timeout config
+timeout: '1200s'

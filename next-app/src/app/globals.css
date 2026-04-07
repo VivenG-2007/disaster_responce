@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 230, 235, 255;
+  --background-start-rgb: 8, 12, 24;
+  --glass-bg: rgba(19, 27, 46, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --primary: #7bd0ff;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: radial-gradient(circle at top left, #1a2a4a, transparent 40%),
+              radial-gradient(circle at bottom right, #0a1122, transparent 40%),
+              rgb(var(--background-start-rgb));
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+.glass-morphism {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease-in-out;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Custom styles for Leaflet markers and overlays */
+.custom-marker-ambulance { filter: drop-shadow(0 0 8px #7bd0ff); }
+.custom-marker-firetruck { filter: drop-shadow(0 0 8px #ef4444); }
+.custom-marker-police { filter: drop-shadow(0 0 8px #b7c8e1); }
+
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  transition: transform 0.15s linear !important;
+}
+
+.custom-popup .leaflet-popup-content-wrapper {
+  background: rgba(19, 27, 46, 0.9) !important;
+  backdrop-filter: blur(12px);
+  color: #dae2fd !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0;
+  border-radius: 12px !important;
+}
+.custom-popup .leaflet-popup-tip {
+  background: rgba(19, 27, 46, 0.9) !important;
+}
+
