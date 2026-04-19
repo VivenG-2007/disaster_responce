@@ -16,7 +16,7 @@ const Navbar = () => {
 
   
   return (
-    <header className="h-16 glass-morphism flex items-center justify-between px-6 z-40 fixed top-0 left-0 lg:left-64 right-0 !border-t-0 !border-l-0 !border-r-0 !shadow-none w-full lg:w-[calc(100%-16rem)]">
+    <header className="h-16 glass-morphism flex items-center justify-between px-6 z-[9999] fixed top-0 left-0 lg:left-64 right-0 !border-t-0 !border-l-0 !border-r-0 !shadow-none w-full lg:w-[calc(100%-16rem)]">
       <div className="flex items-center space-x-6">
         <Link href="/">
           <h1 className="text-xl font-black tracking-tighter text-[#dae2fd] select-none uppercase tracking-[0.3em] bg-gradient-to-r from-white to-[#7bd0ff] bg-clip-text text-transparent [-webkit-background-clip:text] cursor-pointer">Disaster Response</h1>
@@ -76,7 +76,7 @@ const Navbar = () => {
 
           {/* 📬 Notifications Dropdown */}
           {showNotifications && (
-            <div className="absolute top-14 right-0 w-80 glass-morphism rounded-[24px] border border-white/5 shadow-2xl z-[100] animate-in fade-in zoom-in duration-200 overflow-hidden backdrop-blur-3xl">
+            <div className="absolute top-14 right-0 w-80 glass-morphism rounded-[24px] border border-white/5 shadow-2xl z-[9999] animate-in fade-in zoom-in duration-200 overflow-hidden backdrop-blur-3xl">
                <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#dae2fd]">Sector 7 Triage</h3>
                   <span className="text-[8px] bg-[#7bd0ff]/10 text-[#7bd0ff] px-2 py-0.5 rounded font-black uppercase">Live Updates</span>

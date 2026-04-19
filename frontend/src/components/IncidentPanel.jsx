@@ -22,8 +22,9 @@ const IncidentPanel = ({ incidents, onSelect, activeId }) => {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {incidents.map((incident) => {
-          const isHigh = incident.severity === 'High';
-          const isMed = incident.severity === 'Medium';
+          const severity = (incident.severity || '').toLowerCase();
+          const isHigh = severity === 'high' || severity === 'critical';
+          const isMed = severity === 'medium';
           const isActive = activeId === incident.id;
           
           return (

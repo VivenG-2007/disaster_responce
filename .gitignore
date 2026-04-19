@@ -7,11 +7,14 @@
 .env.test.local
 .env.production.local
 serviceAccountKey.json
+*serviceAccount*.json
+*service-account*.json
 *.pem
 *.key
 *.cert
 auth_key.json
 secrets.json
+gcp_credentials.json
 
 # 📦 DEPENDENCIES
 node_modules/

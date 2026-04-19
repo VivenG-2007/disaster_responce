@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Prevent indexing of API routes and internal Next.js pages
+Disallow: /api/
+Disallow: /_next/
+
+# Admin pages should not be indexed
+Disallow: /fleet
+Disallow: /logs
+
+# Sitemap location
+Sitemap: https://nexus-command.vercel.app/sitemap.xml

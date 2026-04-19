@@ -71,3 +71,47 @@ body {
   background: rgba(19, 27, 46, 0.9) !important;
 }
 
+/* ======================================================
+   🔔 TOAST NOTIFICATIONS — Force above Leaflet map
+   Leaflet internally creates stacking contexts via its
+   pane system. Toasts must be explicitly elevated.
+   ====================================================== */
+.Toastify__toast-container {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+.Toastify__toast {
+  z-index: 99999 !important;
+  background: #131b2e !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  color: #dae2fd !important;
+  font-family: 'Inter', sans-serif !important;
+  border-radius: 12px !important;
+}
+
+.Toastify__progress-bar {
+  background: #7bd0ff !important;
+}
+
+.Toastify__close-button {
+  color: #7bd0ff !important;
+  opacity: 0.6;
+}
+
+/* ======================================================
+   📜 CUSTOM SCROLLBAR
+   ====================================================== */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(123, 208, 255, 0.2);
+  border-radius: 99px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 208, 255, 0.4);
+}

@@ -124,8 +124,25 @@ const MapComponent = ({ activeIncident, vehicles = [], incidents = [], heatmapMo
                 return;
             }
             if (!process.env.NEXT_PUBLIC_MAPS_API_KEY) {
-                // No key, fallback immediately
-                setRealRoute(routeCoordinates);
+                // No key, fallback to a randomized path to simulate urban road turns
+                const [startLat, startLng] = assignedVehicle.position;
+                const [endLat, endLng] = activeIncident.position;
+                const randomPath = [assignedVehicle.position];
+                const steps = 6;
+                
+                for (let i = 1; i < steps; i++) {
+                    const fraction = i / steps;
+                    // Random orthogonal jitter to mimic city blocks
+                    const jitterLat = (Math.random() - 0.5) * 0.008;
+                    const jitterLng = (Math.random() - 0.5) * 0.008;
+                    
+                    randomPath.push([
+                        startLat + ((endLat - startLat) * fraction) + jitterLat,
+                        startLng + ((endLng - startLng) * fraction) + jitterLng
+                    ]);
+                }
+                randomPath.push(activeIncident.position);
+                setRealRoute(randomPath);
                 return;
             }
             try {
@@ -150,6 +167,7 @@ const MapComponent = ({ activeIncident, vehicles = [], incidents = [], heatmapMo
                     const decoded = polyline.decode(encoded);
                     setRealRoute(decoded);
                 } else {
+                    // Fall back to straight line if API fails
                     setRealRoute(routeCoordinates);
                 }
             } catch (e) {

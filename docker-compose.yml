@@ -1,95 +1,151 @@
 services:
-  # 🏢 COMMAND DASHBOARD - Tactical Frontend
+  # ─────────────────────────────────────────────
+  # Frontend — Next.js (standalone Docker build)
+  # ─────────────────────────────────────────────
   frontend:
     build:
-      context: ./next-app
+      context: ./frontend
       dockerfile: Dockerfile
+      # NEXT_PUBLIC_* vars must be baked in at build time by Next.js
+      args:
+        NEXT_PUBLIC_API_URL: http://backend-node:5000
+        NEXT_PUBLIC_BACKEND_URL: http://backend-node:5000
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+        NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${NEXT_PUBLIC_FIREBASE_DATABASE_URL}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}
+        NEXT_PUBLIC_GEMINI_API_KEY: ${NEXT_PUBLIC_GEMINI_API_KEY}
     container_name: sector7-frontend
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
+      - NODE_ENV=production
+      # Runtime env (for server-side usage in Next.js API routes)
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+    depends_on:
+      backend-node:
+        condition: service_healthy
     networks:
       - tactical-net
 
-  # 🛰️ HYBRID GATEWAY - Node.js Tactical API
+  # ─────────────────────────────────────────────
+  # Backend Node.js Gateway
+  # ─────────────────────────────────────────────
   backend-node:
     build:
       context: ./backend/node
       dockerfile: Dockerfile
     container_name: sector7-node-gateway
+    restart: unless-stopped
     ports:
       - "5000:5000"
+    env_file:
+      - ./backend/.env
     environment:
+      - NODE_ENV=production
       - NODE_PORT=5000
-      - PYTHON_AI_URL=http://backend-python:8000/api/analyze
-      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - MONGODB_DB_NAME=sector7
+      # Use replica-set URI for change-stream support
+      - MONGODB_URI=mongodb://mongodb:27017/sector7?replicaSet=rs0
+      # Lock CORS to the frontend container and any public domain
+      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000,${FRONTEND_URL:-}
     depends_on:
-      - backend-python
-      - elasticsearch
+      mongo-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
     networks:
       - tactical-net
 
-  # 🌪️ NEURAL CORE - Python Gemini AI
-  backend-python:
-    build:
-      context: ./backend/python
-      dockerfile: Dockerfile
-    container_name: sector7-python-ai
+  # ─────────────────────────────────────────────
+  # MongoDB (pinned version — avoids surprise upgrades)
+  # ─────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: sector7-mongodb
+    restart: unless-stopped
     ports:
-      - "8000:8000"
-    environment:
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - "27017:27017"
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - mongo_data:/data/db
     networks:
       - tactical-net
 
-  # 🏎️ TACTICAL SIMULATOR - GPS GPS Movement
+  # ─────────────────────────────────────────────
+  # Replica Set Initializer (one-shot job)
+  # ─────────────────────────────────────────────
+  mongo-setup:
+    image: mongo:7.0
+    container_name: sector7-mongo-setup
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - >
+        mongosh --host mongodb:27017 --quiet --eval "
+        try {
+          const status = rs.status();
+          if (status.ok === 1) {
+            print('Replica set already initialized');
+          }
+        } catch (error) {
+          rs.initiate({
+            _id: 'rs0',
+            members: [{ _id: 0, host: 'mongodb:27017' }]
+          });
+          print('Replica set initialized');
+        }"
+    networks:
+      - tactical-net
+
+  # ─────────────────────────────────────────────
+  # Vehicle / Incident Simulator
+  # ─────────────────────────────────────────────
   simulation:
     build:
       context: .
-      dockerfile: scripts/Dockerfile.sim # I'll create this
+      dockerfile: scripts/Dockerfile.sim
     container_name: sector7-simulator
+    restart: unless-stopped
     environment:
-      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
-    networks:
-      - tactical-net
-
-  # 📊 ELASTICSEARCH - Search & Analytical Engine
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.1
-    container_name: sector7-elastic
-    environment:
-      - node.name=sector7-node
-      - cluster.name=sector7-cluster
-      - discovery.type=single-node
-      - xpack.security.enabled=false 
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ports:
-      - "9200:9200"
-    networks:
-      - tactical-net
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-
-  # 📈 KIBANA - Visual Analytics Dashboard
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.13.1
-    container_name: sector7-kibana
+      - MONGODB_URI=mongodb://mongodb:27017/sector7?replicaSet=rs0
     depends_on:
-      - elasticsearch
-    ports:
-      - "5601:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      mongo-setup:
+        condition: service_completed_successfully
     networks:
       - tactical-net
 
-  # 🔄 n8n - Workflow Automation
+  # ─────────────────────────────────────────────
+  # n8n Automation (optional, high-severity webhooks)
+  # ─────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: sector7-n8n
+    restart: unless-stopped
     ports:
       - "5678:5678"
     volumes:
@@ -102,8 +158,7 @@ networks:
     driver: bridge
 
 volumes:
-  es_data:
+  mongo_data:
     driver: local
   n8n_data:
     driver: local
-

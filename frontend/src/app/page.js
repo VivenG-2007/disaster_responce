@@ -1,7 +1,7 @@
 "use client";
 import dynamic from 'next/dynamic';
 import React, { useState, useEffect } from 'react';
-import { SignedIn, SignedOut, SignInButton, useUser } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, useAuth, useUser } from '@clerk/nextjs';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import IncidentPanel from '../components/IncidentPanel';
@@ -91,12 +91,14 @@ const ClerkIdentityLink = ({ children }) => {
 
 function DashboardMain({ user }) {
   const { role, updateRole, logout, isLoading } = useRole();
-  const { vehicles, incidents, reportIncident } = useFirebaseData();
+  const { vehicles, incidents, reportIncident, dataSource } = useFirebaseData();
+  const { getToken } = useAuth();
   const [activeIncident, setActiveIncident] = useState(null);
   const [localVehicles, setLocalVehicles] = useState(INITIAL_VEHICLES);
   const [localIncidents, setLocalIncidents] = useState(INITIAL_INCIDENTS);
   
   const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
   
   // 🔐 Automated Admin Identity Verification
   const ADMIN_EMAILS = [
@@ -124,8 +126,7 @@ function DashboardMain({ user }) {
     if (role === 'people') {
        const fetchHeatmap = async () => {
            try {
-               const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
-               const res = await fetch(`${BACKEND_URL}/api/heatmap`);
+               const res = await fetch(`${backendUrl}/api/heatmap`);
                if (res.ok) {
                    const data = await res.json();
                    if (data.points && data.points.length > 0) {
@@ -150,65 +151,79 @@ function DashboardMain({ user }) {
        };
        fetchHeatmap();
     }
-  }, [role]);
+  }, [backendUrl, role]);
 
   if (isLoading) return <div className="h-screen bg-[#080c18] flex items-center justify-center animate-pulse text-[#7bd0ff] font-black tracking-[0.5em] uppercase text-xs">VERIFYING NEURAL LINK...</div>;
   if (!role) return <RoleSelector onSelect={updateRole} />;
 
-  // Ensure we prioritize mock data ONLY if Firebase is unconfigured or returns empty
-  const displayVehicles = vehicles.length > 3 ? vehicles : (localVehicles || INITIAL_VEHICLES);
-  const displayIncidents = incidents.length > 2 ? incidents : (localIncidents || INITIAL_INCIDENTS);
+  // Prioritize real database data as soon as it arrives!
+  const displayVehicles = vehicles.length > 0 ? vehicles : (localVehicles || INITIAL_VEHICLES);
+  const displayIncidents = incidents.length > 0 ? incidents : (localIncidents || INITIAL_INCIDENTS);
 
-  const handleSubmitReport = async (description, customCoords = null) => {
+  const handleSubmitReport = async (description, customCoords = null, triageResult = null, photoUrl = null) => {
      toast.info("Broadcast sequence initiated...", { theme: 'dark', autoClose: 1000 });
      
      try {
-         // 🔥 NEW: CALL HYBRID BACKEND (Node.js Gateway)
-         const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
-         const response = await fetch(`${BACKEND_URL}/api/report`, {
+         const token = await getToken().catch(() => null);
+
+         // Build request body — if IncidentInput already ran the AI Triad,
+         // pass the pre-analyzed result to skip double analysis on the backend.
+         const body = {
+           description,
+           lat: customCoords?.lat || 17.5234,
+           lng: customCoords?.lng || 78.6681,
+           ...(triageResult ? { preAnalyzed: triageResult } : {}),
+           ...(photoUrl ? { photoUrl } : {}),
+         };
+
+         const response = await fetch(`${backendUrl}/api/report`, {
              method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-                description,
-                lat: customCoords?.lat || 17.5234,
-                lng: customCoords?.lng || 78.6681
-             })
+             headers: {
+               'Content-Type': 'application/json',
+               ...(token ? { Authorization: `Bearer ${token}` } : {})
+             },
+             body: JSON.stringify(body)
          });
 
          if (response.ok) {
             const { tacticalData } = await response.json();
-            toast.success(`VERIFIED: ${tacticalData.type.toUpperCase()} - SEVERITY: ${tacticalData.severity.toUpperCase()}`, { theme: 'dark' });
+            const engine = tacticalData?.ai_engine || triageResult?.ai_engine || 'AI';
+            toast.success(`VERIFIED: ${(tacticalData.type || 'incident').toUpperCase()} — SEVERITY: ${(tacticalData.severity || '?').toUpperCase()} [${engine}]`, { theme: 'dark' });
             return;
          }
+
+         console.warn('Backend report request failed:', response.status);
      } catch (err) {
          console.warn("[HYBRID OFFLINE] Falling back to local simulation.", err);
      }
 
-     // 🛡️ FALLBACK: LOCAL MOCK LOGIC (If backend is offline)
-     // 🛡️ TACTICAL NEURAL DISPATCHER (AI Core Resource Analysis)
+     // 🛡️ FALLBACK: LOCAL MOCK LOGIC (if backend + AI are both offline)
      setTimeout(async () => {
          const desc = (description || '').toLowerCase();
          const pos = customCoords ? [customCoords.lat, customCoords.lng] : [17.5234 + (Math.random() - 0.5) * 0.05, 78.6681 + (Math.random() - 0.5) * 0.05];
          
-         // 🧠 Step 1: Intelligent Incident Triage
-         let type = 'Emergency Contact'; let severity = 'Medium'; let requiredType = 'police';
-         if (desc.includes('fire')) { type = 'Structure Fire'; severity = 'High'; requiredType = 'firetruck'; }
-         else if (desc.includes('injury') || desc.includes('accident') || desc.includes('crash')) { type = 'Medical Emergency'; severity = 'High'; requiredType = 'ambulance'; }
-         else if (desc.includes('traffic')) { type = 'Safety Call'; severity = 'Low'; requiredType = 'police'; }
+         // Use pre-analyzed result if available, else crude keyword triage
+         let type = triageResult?.type || 'Emergency Contact';
+         let severity = triageResult?.severity || 'Medium';
+         let requiredType = 'police';
+         if (!triageResult) {
+           if (desc.includes('fire')) { type = 'Structure Fire'; severity = 'High'; requiredType = 'firetruck'; }
+           else if (desc.includes('injury') || desc.includes('accident') || desc.includes('crash')) { type = 'Medical Emergency'; severity = 'High'; requiredType = 'ambulance'; }
+         } else {
+           requiredType = (triageResult.vehicles_required || ['police'])[0];
+         }
 
-         // 🧠 Step 2: 24h Operational Load Analysis (Neural Simulation)
          const analyzedFleet = displayVehicles.map(v => {
              const dist = Math.sqrt(Math.pow(v.position[0]-pos[0], 2) + Math.pow(v.position[1]-pos[1], 2));
              const typeScore = v.type === requiredType ? 100 : v.type === 'ambulance' ? 50 : 20; 
-             const shiftFatigue = Math.random() * 0.25; // Simulate 24h fatigue penalty
+             const shiftFatigue = Math.random() * 0.25;
              return { ...v, tacticalScore: (typeScore / (dist * 1000 + 1)) * (1 - shiftFatigue) };
          });
 
-         // 🧠 Step 3: Elite Allocation
          const sortedFleet = [...analyzedFleet].sort((a,b) => b.tacticalScore - a.tacticalScore);
          const responder = sortedFleet[0];
 
-         toast.info(`NEURAL CO-PILOT: Allocating ${responder.name} (Efficiency: ${Math.floor(responder.tacticalScore)}%)`, { theme: 'dark' });
+         toast.info(`NEURAL CO-PILOT: Allocating ${responder.name}`, { theme: 'dark' });
 
          const newIncident = {
              id: Date.now(),
@@ -218,7 +233,8 @@ function DashboardMain({ user }) {
              position: pos,
              assigned_vehicle: responder.name,
              assignedVehicle: responder.name,
-             description: `[AI TRIAGE] ${description}`,
+             description: `[OFFLINE TRIAGE] ${description}`,
+             photoUrl: photoUrl || null,
              timestamp: Date.now()
          };
 
@@ -237,6 +253,13 @@ function DashboardMain({ user }) {
         handleSubmitReport("Manager-level tactical marker placement.", latlng);
      }
   };
+
+  // Data source badge helper
+  const sourceBadge = {
+    firebase: { label: '🔥 Firebase Live', color: 'text-orange-400 border-orange-400/20 bg-orange-400/5' },
+    mongodb:  { label: '⚡ MongoDB Live',  color: 'text-[#7bd0ff] border-[#7bd0ff]/20 bg-[#7bd0ff]/5' },
+    mock:     { label: '🔶 Mock Data',     color: 'text-amber-400 border-amber-400/20 bg-amber-400/5' },
+  }[dataSource] || { label: '● Connecting...', color: 'text-slate-400 border-slate-400/20' };
 
 
   // PEOPLE (CITIZEN) VIEW
@@ -292,6 +315,10 @@ function DashboardMain({ user }) {
                        <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#dae2fd]">Sector 7 Live Cluster Feed</span>
                        <span className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Hyderabad-Keesara Mandal Grid</span>
                     </div>
+                    {/* Data source badge */}
+                    <span className={`ml-2 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${sourceBadge.color}`}>
+                      {sourceBadge.label}
+                    </span>
                  </div>
               </div>
 
@@ -339,7 +366,13 @@ function DashboardMain({ user }) {
            </div>
         </main>
         
-        <ToastContainer position="bottom-right" autoClose={3000} theme="dark" toastStyle={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.05)', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }} />
+        <ToastContainer
+          position="bottom-right"
+          autoClose={3000}
+          theme="dark"
+          style={{ zIndex: 99999 }}
+          toastStyle={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.05)', color: '#dae2fd', fontFamily: 'Inter, sans-serif', zIndex: 99999 }}
+        />
       </div>
     );
   }
@@ -372,7 +405,15 @@ function DashboardMain({ user }) {
           <IncidentPanel incidents={displayIncidents} onSelect={setActiveIncident} activeId={activeIncident?.id} />
         </main>
       </div>
-      <ToastContainer pauseOnFocusLoss={false} hideProgressBar={true} />
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3500}
+        theme="dark"
+        pauseOnFocusLoss={false}
+        hideProgressBar={false}
+        style={{ zIndex: 99999 }}
+        toastStyle={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.07)', color: '#dae2fd', fontFamily: 'Inter, sans-serif', zIndex: 99999 }}
+      />
     </div>
   );
 }
@@ -426,4 +467,3 @@ export default function Home() {
     </AuthGate>
   );
 }
-

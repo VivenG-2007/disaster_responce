@@ -12,11 +12,34 @@ from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 load_dotenv(dotenv_path='../.env')
 
-# --- Initialize AI Infrastructure ---
-app = FastAPI(title="Sector 7 - Python Neural Core")
+GCP_PROJECT = os.getenv('GCP_PROJECT_ID')
+PYTHON_PORT = int(os.getenv('PYTHON_PORT', '8000'))
 
-vertexai.init(project=os.getenv('GCP_PROJECT_ID'), location="us-central1")
-ai_model = GenerativeModel("gemini-1.5-pro")
+# --- Initialize AI Infrastructure ---
+app = FastAPI(
+    title="Sector 7 - Python Neural Core",
+    version="1.0.0",
+    description="Vertex AI / Gemini analysis micro-service for disaster triage",
+    docs_url=None if os.getenv('NODE_ENV') == 'production' else '/docs',
+    redoc_url=None,
+)
+
+# CORS — allow the Node.js gateway and any configured frontend
+_cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5000,http://backend-node:5000').split(',')
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins],
+    allow_credentials=True,
+    allow_methods=["POST", "GET"],
+    allow_headers=["*"],
+)
+
+if GCP_PROJECT:
+    vertexai.init(project=GCP_PROJECT, location="us-central1")
+    ai_model = GenerativeModel("gemini-1.5-pro")
+else:
+    ai_model = None
+    print("[WARN] GCP_PROJECT_ID not set — Vertex AI disabled, will return 503 on /api/analyze")
 
 # --- Schemas ---
 class AIRequest(BaseModel):
@@ -32,6 +55,15 @@ class AIResult(BaseModel):
 
 # --- Operations ---
 
+@app.get("/health")
+async def health_check():
+    """Liveness probe for Docker / Kubernetes."""
+    return {
+        "status": "ok",
+        "service": "sector7-python-core",
+        "ai": "vertex_ai" if ai_model else "disabled",
+    }
+
 @app.post("/api/analyze", response_model=AIResult)
 async def analyze_incident(req: AIRequest):
     """
@@ -40,6 +72,8 @@ async def analyze_incident(req: AIRequest):
     2. Receives Tactical Analysis
     3. Returns JSON to Node.js Gateway
     """
+    if not ai_model:
+        raise HTTPException(status_code=503, detail="Vertex AI is not configured (missing GCP_PROJECT_ID)")
     
     prompt = f"""
     Act as a Tactical Emergency Triage AI for Sector 7 Disaster Command.
@@ -76,4 +110,5 @@ async def analyze_incident(req: AIRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print(f"[Sector 7] Python Neural Core starting on port {PYTHON_PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=PYTHON_PORT, log_level="info")

@@ -4,11 +4,10 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Install Tactical dependencies
-RUN pip install firebase-admin python-dotenv
+RUN pip install pymongo
 
 # Copy Tactical Simulation Logic
 COPY scripts/simulate.py /app/simulate.py
-COPY serviceAccountKey.json /app/serviceAccountKey.json
 
 # Expose nothing (Internal Feed Only)
 CMD ["python", "simulate.py"]

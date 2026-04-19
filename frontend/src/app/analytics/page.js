@@ -3,8 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
 import Navbar from '../../components/Navbar';
 import { Activity, Users, TrendingUp, AlertCircle } from 'lucide-react';
-import { ref, onValue } from 'firebase/database';
-import { db as firebaseDb } from '../../lib/firebase';
+import { useFirebaseData } from '../../hooks/useFirebaseData';
 
 const StatCard = ({ icon: Icon, label, value, trend, color }) => (
   <div className="glass-morphism rounded-3xl p-6 flex flex-col gap-4 border border-white/5 hover:border-white/10 transition-all duration-300 group">
@@ -26,7 +25,6 @@ const StatCard = ({ icon: Icon, label, value, trend, color }) => (
   </div>
 );
 
-
 // 🧮 Group incidents into 12 hourly buckets for the last 12 hours
 function buildHourlyBuckets(incidents) {
   const now = Date.now();
@@ -44,27 +42,21 @@ function buildHourlyBuckets(incidents) {
 }
 
 export default function AnalyticsPage() {
-  const [incidents, setIncidents] = useState([]);
+  const { incidents } = useFirebaseData();
   const [loading, setLoading] = useState(true);
 
-  // 🔥 Live Firebase subscription
   useEffect(() => {
-    if (!firebaseDb) { setLoading(false); return; }
-    const incRef = ref(firebaseDb, 'incidents');
-    const unsub = onValue(incRef, (snap) => {
-      const raw = snap.val() || {};
-      setIncidents(Object.values(raw));
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
+    if (incidents) {
+        setLoading(false);
+    }
+  }, [incidents]);
 
   // 📊 Derived stats
   const hourlyBuckets = buildHourlyBuckets(incidents);
   const maxBucket = Math.max(...hourlyBuckets, 1); // avoid div/0
   const highCount  = incidents.filter(i => (i.severity || '').toLowerCase() === 'high').length;
   const totalCount = incidents.length;
-  const aiCallCount = totalCount; // 1 Gemini call per incident
+  const aiCallCount = totalCount; // 1 Gemini/Groq call per incident
   const resolvedCount = incidents.filter(i => i.status === 'resolved').length;
   const operationalPct = totalCount > 0 ? Math.min(100, Math.round((1 - highCount / totalCount) * 100)) : 74;
   const circumference = 2 * Math.PI * 88; // r=88
@@ -91,7 +83,7 @@ export default function AnalyticsPage() {
               <div>
                 <h1 className="text-3xl font-black tracking-tighter uppercase mb-2">Systems Analytics</h1>
                 <p className="text-sm text-[#7bd0ff] font-bold tracking-widest uppercase opacity-80">
-                  Sector 7 · Live Firebase feed · Last 12 hours
+                  Sector 7 · Live Datastream · Last 12 hours
                 </p>
               </div>
               <div className="flex gap-3">
@@ -103,21 +95,21 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Stat Cards — all driven from live Firebase data */}
+            {/* Stat Cards — all driven from live data */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard icon={Activity}    label="Total Incidents"   value={loading ? '...' : totalCount}                     trend={highCount > 0 ? `${highCount} critical` : 'All clear'} color="[#7bd0ff]" />
               <StatCard icon={AlertCircle} label="High Severity"     value={loading ? '...' : highCount}                      trend={highCount > 2 ? '⚠ Elevated' : 'Normal'}               color="red-500" />
               <StatCard icon={Users}       label="Resolved"          value={loading ? '...' : resolvedCount}                  trend={`${totalCount - resolvedCount} active`}                 color="emerald-400" />
-              <StatCard icon={TrendingUp}  label="Gemini AI Calls"   value={loading ? '...' : aiCallCount}                    trend="99.8% accurate"                                         color="blue-400" />
+              <StatCard icon={TrendingUp}  label="Triage AI Calls"   value={loading ? '...' : aiCallCount}                    trend="99.8% accurate"                                         color="blue-400" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* 📊 LIVE BAR CHART — hourly incident frequency from Firebase */}
+              {/* 📊 LIVE BAR CHART — hourly incident frequency from db */}
               <div className="lg:col-span-2 glass-morphism rounded-3xl p-8 border border-white/5 relative overflow-hidden h-[400px]">
                 <div className="flex justify-between items-center mb-8">
                   <div>
                     <h3 className="text-xs font-black tracking-[0.3em] uppercase opacity-60">Incident Frequency</h3>
-                    <p className="text-[9px] text-[#7bd0ff] font-bold uppercase tracking-widest opacity-50 mt-1">Last 12 hours · Live Firebase</p>
+                    <p className="text-[9px] text-[#7bd0ff] font-bold uppercase tracking-widest opacity-50 mt-1">Last 12 hours · Datastream</p>
                   </div>
                   <div className="flex gap-4">
                     <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-red-500">
@@ -131,7 +123,7 @@ export default function AnalyticsPage() {
 
                 {loading ? (
                   <div className="flex h-[75%] items-center justify-center text-[#7bd0ff] font-black text-xs tracking-[0.3em] uppercase animate-pulse">
-                    Syncing Firebase...
+                    Syncing Feed...
                   </div>
                 ) : (
                   <div className="relative h-[75%] w-full flex items-end gap-2 pb-8">
@@ -158,7 +150,7 @@ export default function AnalyticsPage() {
                 )}
               </div>
 
-              {/* 🔵 RESOURCE LOAD RING — driven by operational percentage from Firebase */}
+              {/* 🔵 RESOURCE LOAD RING */}
               <div className="glass-morphism rounded-3xl p-8 border border-white/5 flex flex-col">
                  <h3 className="text-xs font-black tracking-[0.3em] uppercase opacity-60 mb-8 text-center leading-none">Sector Resource Load</h3>
                  <div className="flex-1 flex items-center justify-center relative">
@@ -193,7 +185,7 @@ export default function AnalyticsPage() {
                        ></div>
                     </div>
                     <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest text-center pt-2">
-                      {loading ? 'Connecting to Firebase...' : `Live · ${totalCount} total incidents logged`}
+                      {loading ? 'Connecting Feed...' : `Live · ${totalCount} total incidents logged`}
                     </p>
                  </div>
               </div>
@@ -204,4 +196,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
