@@ -94,5 +94,5 @@ docker-compose --env-file frontend/.env.local up -d --build
 ---
 
 <p align="center">
-  Built with ❤️ for the <b>Google Solution Challenge 2024</b>.
+  Built with ❤️ for the <b>Google Solution Challenge 2026</b>.
 </p>
