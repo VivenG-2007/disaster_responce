@@ -1,6 +1,6 @@
 # <img src="assets/logo.png" width="48" align="center" /> Sector 7: AI-Driven Disaster Command System
 
-[![Google Solution Challenge](https://img.shields.io/badge/Google-Solution%20Challenge%202024-4285F4?style=for-the-badge&logo=google)](https://developers.google.com/community/solutions-challenge)
+[![Google Solution Challenge](https://img.shields.io/badge/Google-Solution%20Challenge%202026-4285F4?style=for-the-badge&logo=google)](https://developers.google.com/community/solutions-challenge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Stack: Next.js + Gemini + Firebase](https://img.shields.io/badge/Stack-Next.js%20%2B%20Gemini%20%2B%20Firebase-orange?style=for-the-badge)](https://nextjs.org/)
 
